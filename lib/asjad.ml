@@ -1,4 +1,8 @@
-let is_lower_case c = let reg = Str.regexp "[a-z]" in Str.string_match reg c 0  ;;
+
+ module Nullable =
+ struct
+
+ let is_lower_case c = let reg = Str.regexp "[a-z]" in Str.string_match reg c 0  ;;
 
 let tukelda s =
   let s = String.trim s in
@@ -56,44 +60,40 @@ let print_nullable term table =print_endline ("Terminal: " ^ term ^ " Nullable: 
 let print_terminal_all table = Hashtbl.iter (fun x _ -> print_terminal x table) table;;
 
 let print_nullable_all table = Hashtbl.iter (fun x _ -> print_nullable x table) table;;
-
-
- module Nullable =
- struct
-
  
- let val_unknown parem = let module Set = Set.Make(String) in let c = List.init (String.length parem.tervik) (String.get parem.tervik) in
- let c = List.map (fun x -> Char.escaped x) c in
- let li = List.fold_left (fun set elem -> Set.add elem set) Set.empty c in
- let string_list = Set.elements li in let vaartused = List.map (fun x -> Hashtbl.find_opt nullable x) string_list in
- if List.mem None vaartused then ()
- else let vaartused = List.map (fun x -> Hashtbl.find nullable x) string_list in
- if List.mem true vaartused then parem.value <- True
- else parem.value <- False
- ;;
+let val_unknown parem =
+let c = List.init (String.length parem.tervik) (String.get parem.tervik) in
+let c = List.map (fun x -> Char.escaped x) c in
+let vaartused = List.map (fun x -> Hashtbl.find_opt nullable x) c in
+let _contain_none = List.mem None vaartused in
+let _contain_false = List.mem (Some false) vaartused in
+if _contain_false then parem.value <- False
+else
+begin if _contain_none then ()
+else parem.value <- True
+end
 
- let try_val_unknown parem_list = List.iter (fun x -> if x.value = Unknown then val_unknown x else ()) parem_list
+
+let try_val_unknown parem_list = List.iter (fun x -> if x.value = Unknown then val_unknown x else ()) parem_list
 ;;
 
- let try_eval term parem_list = let value = contains_true parem_list in
- let unknown = contains_unknown parem_list in 
+let try_eval term parem_list = let value = contains_true parem_list in
+let unknown = contains_unknown parem_list in 
   match value, unknown with
   | true, _ -> Hashtbl.replace nullable term true
   | false, false -> Hashtbl.replace nullable term false
   | false, true -> try_val_unknown parem_list
  ;;
-
- let rec find_nullable () =
+let rec find_nullable () =
   if Hashtbl.length nullable = Hashtbl.length hash then nullable
-  else (Hashtbl.iter (fun x y -> try_eval x y) hash; find_nullable ())
+  else 
+    (Hashtbl.iter (fun x y -> try_eval x y) hash; find_nullable ());;
 
- let leia_nullable str = let list = gram_to_list str in loo_pooled list;
- find_nullable();
-end
+let leia_nullable str = let list = gram_to_list str in loo_pooled list;
+  find_nullable();;
 
 
-
-let test_string = "T → R
+ let test_string = "T → R
 T → aTc
 R →
 R → bR";;
@@ -101,7 +101,19 @@ R → bR";;
 let test_string_2 = "A → BAa
 A →
 B → bBc
-B → AA"
+B → AA";;
 
-let asi () = let table = (Nullable.leia_nullable test_string_2) in print_nullable_all table
+let test_string_3 = "N → AB
+    N → BA
+    A → a
+    A → CAC
+    B → b
+    B → CBC
+    C → a
+    C → b"
+
+let asi () =
+  let table = (leia_nullable test_string_3) in print_nullable_all table
  ;;
+ 
+end

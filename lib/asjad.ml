@@ -11,7 +11,7 @@ type value_atom = True | False | Unknown [@@deriving show]
 
 type parem ={
   tervik : string;
-  value : value_atom
+  mutable value : value_atom
 }
 
 type terminal = {
@@ -20,7 +20,7 @@ type terminal = {
 }
 
 let hash = Hashtbl.create 69;;
-let nullable = Hashtbl.create 69 ;;
+let nullable  = Hashtbl.create 69 ;;
 let loo_parem_pool l =
   let l' = 
   if List.length l = 1 then List.append l ["ε"]
@@ -37,11 +37,6 @@ match Hashtbl.find_opt hash vasak_pool with
 
 let loo_pooled l = List.iter (fun x -> loo_vasak_pool (tukelda x)) l
 
-let test_string = "T → R
-T → aTc
-R →
-R → bR";;
-
 let rec concatParemList lis =
   match lis with
   | [] -> ""
@@ -50,9 +45,8 @@ let rec concatParemList lis =
 
 let contains_unknown l = let mappo = List.map (fun x -> x.value = Unknown) l in List.mem true mappo ;;
 
-
-(* Kui leidub 1 tõeväärtus siis on tõene, sest nullable väärtus on a v b v c *)
-let find_value l = let mappo = List.map (fun x -> x.value = True) l in List.mem true mappo ;;
+(* Kui leidub 1 tõeväärtus siis on tõene, sest nullable(N) = a v b v c *)
+let contains_true l = let mappo = List.map (fun x -> x.value = True) l in List.mem true mappo ;;
 
 let print_terminal term table = let parem = Hashtbl.find table term in
 List.iter (fun x -> print_endline("Terminal: " ^ term ^ " ParemPool :" ^ x.tervik ^ " Väärtus :" ^ (show_value_atom x.value))) parem
@@ -63,16 +57,51 @@ let print_terminal_all table = Hashtbl.iter (fun x _ -> print_terminal x table) 
 
 let print_nullable_all table = Hashtbl.iter (fun x _ -> print_nullable x table) table;;
 
-let try_eval term parem_list = if not (contains_unknown parem_list) then
-  let value = find_value parem_list in Hashtbl.add nullable term value
+
+ module Nullable =
+ struct
+
+ 
+ let val_unknown parem = let module Set = Set.Make(String) in let c = List.init (String.length parem.tervik) (String.get parem.tervik) in
+ let c = List.map (fun x -> Char.escaped x) c in
+ let li = List.fold_left (fun set elem -> Set.add elem set) Set.empty c in
+ let string_list = Set.elements li in let vaartused = List.map (fun x -> Hashtbl.find_opt nullable x) string_list in
+ if List.mem None vaartused then ()
+ else let vaartused = List.map (fun x -> Hashtbl.find nullable x) string_list in
+ if List.mem true vaartused then parem.value <- True
+ else parem.value <- False
+ ;;
+
+ let try_val_unknown parem_list = List.iter (fun x -> if x.value = Unknown then val_unknown x else ()) parem_list
 ;;
 
-let rec find_nullable () =
+ let try_eval term parem_list = let value = contains_true parem_list in
+ let unknown = contains_unknown parem_list in 
+  match value, unknown with
+  | true, _ -> Hashtbl.replace nullable term true
+  | false, false -> Hashtbl.replace nullable term false
+  | false, true -> try_val_unknown parem_list
+ ;;
+
+ let rec find_nullable () =
   if Hashtbl.length nullable = Hashtbl.length hash then nullable
   else (Hashtbl.iter (fun x y -> try_eval x y) hash; find_nullable ())
 
-  
+ let leia_nullable str = let list = gram_to_list str in loo_pooled list;
+ find_nullable();
+end
 
-let asi () = let list = gram_to_list test_string in loo_pooled list; Hashtbl.iter (fun x y -> print_endline (x ^ "->" ^ (concatParemList y) ^ "\n")) hash;
-print_nullable_all (find_nullable());
+
+
+let test_string = "T → R
+T → aTc
+R →
+R → bR";;
+
+let test_string_2 = "A → BAa
+A →
+B → bBc
+B → AA"
+
+let asi () = let table = (Nullable.leia_nullable test_string_2) in print_nullable_all table
  ;;

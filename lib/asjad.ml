@@ -1,7 +1,9 @@
 
+(*Abivahendid testimaks kas on väiketähed e terminalid*)
 let is_lower_case_string c = let reg = Str.regexp "[a-z]" in Str.string_match reg c 0  ;;
 let is_lower_case_char c = let c' = Char.lowercase_ascii c in c = c' ;;
 
+(*Eraldab vasaku ja parema poole grammatika reeglil*)
 let tukelda s =
   let s = String.trim s in
   let reg = Str.regexp "→" in (Str.split reg s);;
@@ -40,6 +42,7 @@ let loo_vasak_pool l = let vasak_pool = List.nth l 0 in let vasak_pool = String.
 let loo_pooled l = List.iter (fun x -> loo_vasak_pool (tukelda x)) l
 ;;
 
+(*Abivahendid Grammatika ja nullable lahendite nägemiseks*)
 let print_terminal term table = let parem = Hashtbl.find table term in
 List.iter (fun x -> print_endline("Terminal: " ^ term ^ " ParemPool :" ^ x.tervik ^ " Väärtus :" ^ (show_value_atom x.value))) parem ;;
 
@@ -85,6 +88,8 @@ let contains_unknown l = let mappo = List.map (fun x -> x.value = Unknown) l in 
 (* Kui leidub 1 tõeväärtus siis on tõene, sest nullable(N) = a v b v c *)
 let contains_true l = let mappo = List.map (fun x -> x.value = True) l in List.mem true mappo ;;
  
+
+(* Üritab väärtustada Mitteterminali*)
 let val_unknown parem =
 let c = List.init (String.length parem.tervik) (String.get parem.tervik) in
 let c = List.map (fun x -> Char.escaped x) c in
@@ -101,6 +106,7 @@ end
 let try_val_unknown parem_list = List.iter (fun x -> if x.value = Unknown then val_unknown x else ()) parem_list
 ;;
 
+(*Väärtustab Mitteterminalid kui neil ei ole Paremal poolel teadmata väärtusega Mitteterminali, muidu saadab edasi*)
 let try_eval term parem_list = let value = contains_true parem_list in
 let unknown = contains_unknown parem_list in 
   match value, unknown with
@@ -108,14 +114,16 @@ let unknown = contains_unknown parem_list in
   | false, false -> Hashtbl.replace nullable term false
   | false, true -> try_val_unknown parem_list
  ;;
-let rec find_nullable () =
+
+(*Jooksutab seni kuni igal Mitteterminalil on nullable väärtus*)
+let rec work_horse () =
   if Hashtbl.length nullable = Hashtbl.length table then nullable
   else 
-    (Hashtbl.iter (fun x y -> try_eval x y) table; find_nullable ());;
+    (Hashtbl.iter (fun x y -> try_eval x y) table; work_horse ());;
 
 let leia_nullable str =
   let list = gram_to_list str in loo_pooled list;
-  find_nullable();;
+  work_horse();;
  
 end
 
@@ -125,9 +133,11 @@ struct
 let first = Hashtbl.create 69;;
 module Set = Set.Make(String);;
 
+(*Abivahendid Set nägemiseks*)
 let print_set set = String.concat ", " (Set.elements set) ;; 
 let print_set_all hshtbl = Hashtbl.iter (fun x y -> print_endline("Terminal: " ^ x ^ " First: " ^ print_set y)) hshtbl ;;
   
+(*Võtab parema poole ja loob sellest Set'i arvestades nullable väärtusi*)
 let parem_to_set parem x nullable = let char_list = List.init (String.length parem.tervik) (String.get parem.tervik) in
 let rec list_to_set array =
   match array with
@@ -145,13 +155,14 @@ let rec list_to_set array =
 in
 Hashtbl.replace first x (Set.union (Hashtbl.find first x) (list_to_set char_list));;
 
-let find_first x y nullable=
+let step_2 x y nullable=
 List.iter (fun par -> parem_to_set par x nullable) y;;
 
-let leia_first nullable =
-Hashtbl.iter (fun x y -> find_first x y nullable) table;
+let step_1 nullable =
+Hashtbl.iter (fun x y -> step_2 x y nullable) table;
 ;;
 
+(*abifunksioon võrdlemaks Hashmappe sest tavaline = ei ole korrektne*)
 let compareHashMaps map1 map2 =
   let vastus = ref true in
   let find_the_truth s =
@@ -161,28 +172,27 @@ let compareHashMaps map1 map2 =
   !vastus
 ;;
 
+(*Leiab first kui anda sisendiks grammatika*)
 let leia_first_string str =
   let nullable = Nullable.leia_nullable str in
-
   (* Igal terminalil on nüüd tühi Set*)
   Hashtbl.iter (fun x _ -> Hashtbl.replace first x Set.empty) nullable; 
-
   let tv = ref false in
   while not !tv do
     let copy = Hashtbl.copy first in
-    leia_first nullable;
+    step_1 nullable;
     tv := compareHashMaps copy first ;
   done;
   first
 ;;
 
+(*Leiab first kui anda sisendiks grammatika ja nullable lahendi*)
   let leia_first_string_nullable  _str nullable =
   Hashtbl.iter (fun x _ -> Hashtbl.replace first x Set.empty) nullable;
-
   let tv = ref false in
   while not !tv do
     let copy = Hashtbl.copy first in
-    leia_first nullable;
+    step_1 nullable;
     tv := compareHashMaps copy first ;
   done;
   first

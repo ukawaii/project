@@ -1,4 +1,4 @@
-open Asjad.Nullable
+open Asjad
 
 let () =
 
@@ -13,6 +13,10 @@ B → CBC
 C → a
 C → b"
 
-in let x =
-leia_nullable grammer in
-print_nullable_all x
+in let null =
+  Nullable.leia_nullable grammer in
+  print_nullable_all null;
+
+let first =
+  First.leia_first_string_nullable grammer null in 
+  First.print_set_all first

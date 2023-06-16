@@ -1,8 +1,6 @@
 
- module Nullable =
- struct
-
- let is_lower_case c = let reg = Str.regexp "[a-z]" in Str.string_match reg c 0  ;;
+let is_lower_case_string c = let reg = Str.regexp "[a-z]" in Str.string_match reg c 0  ;;
+let is_lower_case_char c = let c' = Char.lowercase_ascii c in c = c' ;;
 
 let tukelda s =
   let s = String.trim s in
@@ -23,43 +21,69 @@ type terminal = {
   parem_pool : parem list;
 }
 
-let hash = Hashtbl.create 69;;
-let nullable  = Hashtbl.create 69 ;;
+let table = Hashtbl.create 69;;
+
 let loo_parem_pool l =
   let l' = 
   if List.length l = 1 then List.append l ["ε"]
   else l
   in
   let parem_pool = List.nth l' 1 in let parem_pool = String.trim parem_pool in if parem_pool = "ε" then {tervik = parem_pool; value = True} else
-  if is_lower_case parem_pool then {tervik = parem_pool; value = False} else {tervik = parem_pool; value = Unknown};;
+  if is_lower_case_string parem_pool then {tervik = parem_pool; value = False} else {tervik = parem_pool; value = Unknown};;
 
 let loo_vasak_pool l = let vasak_pool = List.nth l 0 in let vasak_pool = String.trim vasak_pool in
-match Hashtbl.find_opt hash vasak_pool with
-| None -> Hashtbl.add hash vasak_pool [loo_parem_pool l]
-| _ -> Hashtbl.replace hash vasak_pool ([loo_parem_pool l] @ (Hashtbl.find hash vasak_pool))
-;;
+  match Hashtbl.find_opt table vasak_pool with
+  | None -> Hashtbl.add table vasak_pool [loo_parem_pool l]
+  | _ -> Hashtbl.replace table vasak_pool ([loo_parem_pool l] @ (Hashtbl.find table vasak_pool))
+  ;;
 
 let loo_pooled l = List.iter (fun x -> loo_vasak_pool (tukelda x)) l
+;;
 
-let rec concatParemList lis =
-  match lis with
-  | [] -> ""
-  | h :: t -> "" ^ h.tervik ^ "|" ^ concatParemList t
+let print_terminal term table = let parem = Hashtbl.find table term in
+List.iter (fun x -> print_endline("Terminal: " ^ term ^ " ParemPool :" ^ x.tervik ^ " Väärtus :" ^ (show_value_atom x.value))) parem ;;
 
+let print_terminal_all table = Hashtbl.iter (fun x _ -> print_terminal x table) table;;
+
+let print_nullable term table =print_endline ("Terminal: " ^ term ^ " Nullable: " ^  string_of_bool(Hashtbl.find table term));;
+
+let print_nullable_all table = Hashtbl.iter (fun x _ -> print_nullable x table) table;;
+
+let test_string_1 = 
+  "T → R
+   T → aTc
+   R → ε
+   R → bR";;
+  
+let test_string_2 = 
+ "A → BAa
+  A →
+  B → bBc
+  B → AA";;
+
+let test_string_3 =
+    "N → AB
+    N → BA
+    A → a
+    A → CAC
+    B → b
+    B → CBC
+    C → a
+    C → b";;
+
+(* lõputu*)
+let test_string_4 =
+  "S → A
+    A → S";;
+ module Nullable =
+ struct
+
+let nullable  = Hashtbl.create 69 ;;
 
 let contains_unknown l = let mappo = List.map (fun x -> x.value = Unknown) l in List.mem true mappo ;;
 
 (* Kui leidub 1 tõeväärtus siis on tõene, sest nullable(N) = a v b v c *)
 let contains_true l = let mappo = List.map (fun x -> x.value = True) l in List.mem true mappo ;;
-
-let print_terminal term table = let parem = Hashtbl.find table term in
-List.iter (fun x -> print_endline("Terminal: " ^ term ^ " ParemPool :" ^ x.tervik ^ " Väärtus :" ^ (show_value_atom x.value))) parem
-
-let print_nullable term table =print_endline ("Terminal: " ^ term ^ " Nullable: " ^  string_of_bool(Hashtbl.find table term));;
-
-let print_terminal_all table = Hashtbl.iter (fun x _ -> print_terminal x table) table;;
-
-let print_nullable_all table = Hashtbl.iter (fun x _ -> print_nullable x table) table;;
  
 let val_unknown parem =
 let c = List.init (String.length parem.tervik) (String.get parem.tervik) in
@@ -85,35 +109,86 @@ let unknown = contains_unknown parem_list in
   | false, true -> try_val_unknown parem_list
  ;;
 let rec find_nullable () =
-  if Hashtbl.length nullable = Hashtbl.length hash then nullable
+  if Hashtbl.length nullable = Hashtbl.length table then nullable
   else 
-    (Hashtbl.iter (fun x y -> try_eval x y) hash; find_nullable ());;
+    (Hashtbl.iter (fun x y -> try_eval x y) table; find_nullable ());;
 
-let leia_nullable str = let list = gram_to_list str in loo_pooled list;
+let leia_nullable str =
+  let list = gram_to_list str in loo_pooled list;
   find_nullable();;
+ 
+end
 
+module First = 
+struct
 
- let test_string = "T → R
-T → aTc
-R →
-R → bR";;
+let first = Hashtbl.create 69;;
+module Set = Set.Make(String);;
 
-let test_string_2 = "A → BAa
-A →
-B → bBc
-B → AA";;
+let print_set set = String.concat ", " (Set.elements set) ;; 
+let print_set_all hshtbl = Hashtbl.iter (fun x y -> print_endline("Terminal: " ^ x ^ " First: " ^ print_set y)) hshtbl ;;
+  
+let parem_to_set parem x nullable = let char_list = List.init (String.length parem.tervik) (String.get parem.tervik) in
+let rec list_to_set array =
+  match array with
+  | [] -> Set.empty
+  | h :: t ->
+  begin
+    match h with
+      | h when h = '\181' -> Set.empty (*ma ei tea kus see tekib*)
+      | h when (h = "ε".[0]) -> Set.empty
+      | h when (is_lower_case_char h) -> Set.singleton (Char.escaped h)
+      | h -> if Hashtbl.find nullable (Char.escaped h) then
+        Set.union (Hashtbl.find first (Char.escaped h)) (list_to_set t)
+      else Hashtbl.find first (Char.escaped h)
+  end
+in
+Hashtbl.replace first x (Set.union (Hashtbl.find first x) (list_to_set char_list));;
 
-let test_string_3 = "N → AB
-    N → BA
-    A → a
-    A → CAC
-    B → b
-    B → CBC
-    C → a
-    C → b"
+let find_first x y nullable=
+List.iter (fun par -> parem_to_set par x nullable) y;;
+
+let leia_first nullable =
+Hashtbl.iter (fun x y -> find_first x y nullable) table;
+;;
+
+let compareHashMaps map1 map2 =
+  let vastus = ref true in
+  let find_the_truth s =
+    vastus := !vastus && (Set.equal (Hashtbl.find map1 s) (Hashtbl.find map2 s)) (*My dear god, kaua mul läks aega, enne kui sain aru et peab Set.equal kasutama*)
+  in
+  Hashtbl.iter (fun x _ -> find_the_truth x) table;
+  !vastus
+;;
+
+let leia_first_string str =
+  let nullable = Nullable.leia_nullable str in
+
+  (* Igal terminalil on nüüd tühi Set*)
+  Hashtbl.iter (fun x _ -> Hashtbl.replace first x Set.empty) nullable; 
+
+  let tv = ref false in
+  while not !tv do
+    let copy = Hashtbl.copy first in
+    leia_first nullable;
+    tv := compareHashMaps copy first ;
+  done;
+  first
+;;
+
+  let leia_first_string_nullable  _str nullable =
+  Hashtbl.iter (fun x _ -> Hashtbl.replace first x Set.empty) nullable;
+
+  let tv = ref false in
+  while not !tv do
+    let copy = Hashtbl.copy first in
+    leia_first nullable;
+    tv := compareHashMaps copy first ;
+  done;
+  first
+;;
 
 let asi () =
-  let table = (leia_nullable test_string_3) in print_nullable_all table
- ;;
- 
+  ignore (leia_first_string test_string_2)
+;;
 end

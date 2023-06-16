@@ -1,6 +1,7 @@
 open Asjad
 open OUnit2
 
+
 let tests = "General Test" >::: [
   "Something" >:: (fun _ -> First.asi ());
   "Empty rule" >:: (fun _ -> let parem = (let s = tukelda "T → " in (loo_parem_pool s)) in assert_equal parem.value True);
@@ -46,7 +47,45 @@ let tests = "General Test" >::: [
    B → CBC
    C → a
    C → b"
-   ))
+   ));
+
+
+  "T → R
+   T → aTc
+   R →
+   R → bR" >:: (fun _ -> let module Set = Set.Make(String) in 
+   let str =
+    "T → R
+    T → aTc
+    R →
+    R → bR" in
+   let table = First.leia_first_string_nullable str (Nullable.leia_nullable str) in let set = Set.add "a" (Set.singleton "b") in 
+    assert_equal true (Set.equal set (Hashtbl.find table "T")); let set = Set.singleton "b" in assert_equal true (Set.equal set (Hashtbl.find table "R"))
+   );
+
+
+  "N → AB
+   N → BA
+   A → a
+   A → CAC
+   B → b
+   B → CBC
+   C → a
+   C → b" >:: (fun _ -> let module Set = Set.Make(String) in 
+   let str =
+  "N → AB
+   N → BA
+   A → a
+   A → CAC
+   B → b
+   B → CBC
+   C → a
+   C → b" in let table = First.leia_first_string_nullable str (Nullable.leia_nullable str) in let set = Set.add "a" (Set.singleton "b") in
+   assert_equal true (Set.equal set (Hashtbl.find table "N"));assert_equal true (Set.equal set (Hashtbl.find table "A"));
+   assert_equal true (Set.equal set (Hashtbl.find table "B"));assert_equal true (Set.equal set (Hashtbl.find table "C"));
+    );
+
+   
 ]
 
 let _ = run_test_tt_main tests
